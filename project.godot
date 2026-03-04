@@ -1,0 +1,28 @@
+; Engine configuration file.
+; Godot 4.2.1 - EnterpriseVoxelCAD
+
+[application]
+
+config/name="EnterpriseVoxelCAD"
+config/description="Enterprise-grade Voxel CAD engine"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.2", "Forward Plus")
+
+[autoload]
+
+Database="*res://src/scripts/Database.gd"
+VoxelManager="*res://src/scripts/VoxelManager.gd"
+LayerSystem="*res://src/scripts/LayerSystem.gd"
+StructuralAnalyzer="*res://src/scripts/StructuralAnalyzer.gd"
+CommandParser="*res://src/scripts/CommandParser.gd"
+TelemetryService="*res://src/scripts/TelemetryService.gd"
+EngineRegistry="*res://src/scripts/EngineRegistry.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
