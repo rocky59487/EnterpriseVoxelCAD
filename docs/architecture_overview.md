@@ -1,5 +1,95 @@
 # EnterpriseVoxelCAD — Architecture Overview
 
+---
+
+## Virtual Block Engine (Schema v2)
+
+The Virtual Block Engine enables logical grouping of voxels into manipulatable units called "virtual blocks". This abstraction layer sits on top of the raw voxel storage and provides:
+
+### Architecture
+
+```
++---------------------------+
+|  VoxelManager (API)       |
+|  - create_virtual_block() |
+|  - refine_virtual_block() |
+|  - delete_virtual_block() |
++---------------------------+
+            |
+            v
++---------------------------+
+|  structure_tags table     |
+|  - chunk_id               |
+|  - voxel_index            |
+|  - virtual_block_id       |
+|  - structure_level        |
++---------------------------+
+            |
+            v
++---------------------------+
+|  voxel_chunks (BLOB)      |
+|  - Raw voxel storage      |
++---------------------------+
+```
+
+### Key Design Decisions
+
+1. **Non-destructive to existing schema**: Virtual blocks are implemented via a separate `structure_tags` table that references `voxel_chunks.id` and `voxel_index`. The original BLOB storage is unchanged.
+
+2. **In-memory tracking**: `VoxelManager` maintains `_virtual_blocks: Dictionary` mapping `virtual_block_id -> Array[Vector3i]` for fast lookup during editing sessions.
+
+3. **Database persistence**: `structure_tags` table persists the mapping to disk, allowing virtual blocks to be restored when a project is loaded.
+
+4. **Async structural analysis**: Virtual block operations do NOT trigger immediate full structural analysis. Instead:
+   - Local floating checks are performed asynchronously via `StructuralAnalyzer.check_floating_async(position)`
+   - Full load case analysis is triggered by explicit user action or tool-layer events
+
+### Integration with Semantic Command Engine
+
+The Semantic Command Engine (schema v2) provides fuzzy resolution for virtual block commands:
+
+| Canonical Name | Aliases | Description |
+|----------------|---------|-------------|
+| `create_virtual_block` | `cvb,cv,virtblock,vblock` | Create a new virtual block from positions |
+| `refine_virtual_block` | `rvb,refinevb,editvb` | Add/remove voxels from existing virtual block |
+| `delete_virtual_block` | `dvb,delvb,removevb` | Delete a virtual block and all its voxels |
+
+`CommandParser.resolve_command(input)` uses:
+1. Exact match on canonical names
+2. Alias lookup from `semantic_commands` table
+3. Levenshtein distance fuzzy matching (max 2 edit distance)
+
+### Data Flow
+
+```
+User Input (e.g., "cvb")
+        |
+        v
+CommandParser.resolve_command("cvb")
+        |
+        v
+Returns: "create_virtual_block"
+        |
+        v
+CommandParser.execute_command("create_virtual_block", params)
+        |
+        v
+VoxelManager.create_virtual_block(positions, material_id, layer_id)
+        |
+        +--> Creates voxels via create_voxel()
+        +--> Inserts structure_tags for each voxel
+        +--> Emits virtual_block_created signal
+        |
+        v
+TelemetryService.record_event("virtual_block_created", ...)
+```
+
+### Testing
+
+- `tests/test_virtual_block.gd`: Unit tests for VoxelManager virtual block API
+- `tests/test_semantic_commands.gd`: Unit tests for CommandParser fuzzy resolution
+- Integration tests verify end-to-end flow from command input to voxel creation
+
 ## Four-Layer Architecture
 
 ```
