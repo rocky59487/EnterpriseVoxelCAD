@@ -1,4 +1,113 @@
 ## VoxelManager.gd
+
+# ---------------------------------------------------------------------------
+# Virtual Block API (Schema v2)
+# ---------------------------------------------------------------------------
+## Emitted when a virtual block is created.
+signal virtual_block_created(virtual_block_id: int, positions: Array)
+
+## Emitted when a virtual block is modified.
+signal virtual_block_refined(virtual_block_id: int, operations: Array)
+
+## Emitted when a virtual block is deleted.
+signal virtual_block_deleted(virtual_block_id: int)
+
+## Counter for generating unique virtual block IDs.
+var _next_virtual_block_id: int = 1
+
+## Map of virtual_block_id -> Array of Vector3i positions.
+var _virtual_blocks: Dictionary = {}
+
+## Creates a virtual block from an array of voxel positions.
+## Returns the new virtual_block_id.
+func create_virtual_block(positions: Array[Vector3i], material_id: int, layer_id: int) -> int:
+	var vb_id: int = _next_virtual_block_id
+	_next_virtual_block_id += 1
+	
+	# Create all voxels
+	for pos: Vector3i in positions:
+		create_voxel(pos, material_id, layer_id)
+		# Register in structure_tags via Database
+		Database.insert_structure_tag(_current_project_id, pos, vb_id, 0)
+	
+	# Store virtual block mapping
+	_virtual_blocks[vb_id] = positions.duplicate()
+	
+	emit_signal("virtual_block_created", vb_id, positions)
+	TelemetryService.record_event("virtual_block_created", {"vb_id": vb_id, "count": positions.size()})
+	
+	return vb_id
+
+## Refines a virtual block by applying a list of operations.
+## Each operation is a dict: {"op": "add"|"delete", "position": Vector3i}
+func refine_virtual_block(virtual_block_id: int, operations: Array[Dictionary]) -> void:
+	if not _virtual_blocks.has(virtual_block_id):
+		push_error("refine_virtual_block: virtual_block_id %d not found" % virtual_block_id)
+		return
+	
+	var positions: Array = _virtual_blocks[virtual_block_id]
+	
+	for op: Dictionary in operations:
+		var operation: String = op.get("op", "")
+		var pos: Vector3i = op.get("position", Vector3i.ZERO)
+		
+		if operation == "add":
+			if not positions.has(pos):
+				positions.append(pos)
+				# Get material/layer from existing context or defaults
+				var existing = get_voxel(pos)
+				var mat_id = existing.get("material_id", 1)
+				var layer = existing.get("layer_id", 1)
+				create_voxel(pos, mat_id, layer)
+				Database.insert_structure_tag(_current_project_id, pos, virtual_block_id, 0)
+		
+		elif operation == "delete":
+			if positions.has(pos):
+				positions.erase(pos)
+			delete_voxel(pos)
+			Database.delete_structure_tag_by_position(_current_project_id, pos)
+	
+	_virtual_blocks[virtual_block_id] = positions
+	
+	emit_signal("virtual_block_refined", virtual_block_id, operations)
+	TelemetryService.record_event("virtual_block_refined", {"vb_id": virtual_block_id, "ops": operations.size()})
+
+## Deletes a virtual block and all its voxels.
+func delete_virtual_block(virtual_block_id: int) -> void:
+	if not _virtual_blocks.has(virtual_block_id):
+		push_error("delete_virtual_block: virtual_block_id %d not found" % virtual_block_id)
+		return
+	
+	var positions: Array = _virtual_blocks[virtual_block_id]
+	
+	# Delete all voxels
+	for pos: Vector3i in positions:
+		delete_voxel(pos)
+		Database.delete_structure_tag_by_position(_current_project_id, pos)
+	
+	_virtual_blocks.erase(virtual_block_id)
+	
+	emit_signal("virtual_block_deleted", virtual_block_id)
+	TelemetryService.record_event("virtual_block_deleted", {"vb_id": virtual_block_id})
+
+## Returns the list of positions for a virtual block, or empty array if not found.
+func get_virtual_block_positions(virtual_block_id: int) -> Array[Vector3i]:
+	return _virtual_blocks.get(virtual_block_id, [])
+
+## Returns the virtual_block_id for a voxel position, or -1 if not in any virtual block.
+func get_virtual_block_for_voxel(position: Vector3i) -> int:
+	return Database.get_virtual_block_for_voxel(_current_project_id, position)
+
+## Called when a single voxel is deleted (e.g., by user) to sync structure_tags.
+func _on_voxel_deleted_external(position: Vector3i) -> void:
+	var vb_id: int = get_virtual_block_for_voxel(position)
+	if vb_id >= 0 and _virtual_blocks.has(vb_id):
+		var positions: Array = _virtual_blocks[vb_id]
+		if positions.has(position):
+			positions.erase(position)
+			if positions.is_empty():
+				_virtual_blocks.erase(vb_id)
+	Database.delete_structure_tag_by_position(_current_project_id, position)
 ## PUBLIC INTERFACE - DO NOT MODIFY SIGNATURES (AI-0 owned)
 ##
 ## Singleton: VoxelManager
