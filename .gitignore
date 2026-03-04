@@ -1,0 +1,54 @@
+# Build outputs
+builds/
+
+# Godot cache
+.godot/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# SQLite database files (use external path config)
+*.db
+*.db-shm
+*.db-wal
+
+# SQLCipher encrypted databases
+*.sqlcipher
+
+# Environment / secrets
+.env
+.env.local
+*.env
+
+# C++ build artifacts
+src/gdextension/bin/
+src/gdextension/*.os
+src/gdextension/*.o
+src/gdextension/.sconsign.dblite
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# GDExtension compiled libraries
+*.dll
+*.so
+*.dylib
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
