@@ -98,11 +98,14 @@ jobs:
       - name: Run schema migration
         run: sqlite3 /tmp/test.db < tools/db/schema_v1.sql
 
+      - name: Run schema v2 migration
+        run: sqlite3 /tmp/test.db < tools/db/schema_v2.sql
+
       - name: Verify tables exist
         run: |
           TABLES=$(sqlite3 /tmp/test.db ".tables")
           echo "Tables: $TABLES"
-          for tbl in projects materials layers voxel_chunks load_cases schema_migrations; do
+          for tbl in projprojects materials layers voxel_chunks load_cases schema_migrations structure_tags semantic_commands
             echo "$TABLES" | grep -q "$tbl" || (echo "Missing table: $tbl" && exit 1)
           done
           echo "All required tables present."
