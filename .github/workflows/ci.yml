@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # -----------------------------------------------------------------------
+  # 1. GDScript static analysis (gdtoolkit)
+  # -----------------------------------------------------------------------
+  gdscript-lint:
+    name: GDScript Lint
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install gdtoolkit
+        run: pip install gdtoolkit==4.*
+
+      - name: Run gdlint
+        run: gdlint src/scripts/
+
+      - name: Run gdformat check
+        run: gdformat --check src/scripts/
+
+  # -----------------------------------------------------------------------
+  # 2. C++ build (Ubuntu, clang)
+  # -----------------------------------------------------------------------
+  cpp-build-linux:
+    name: C++ Build (Linux / Clang)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake ninja-build clang-15 clang-format-15
+
+      - name: Configure (Release)
+        working-directory: src/gdextension
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-15 \
+            -DCMAKE_CXX_COMPILER=clang++-15
+
+      - name: Build
+        working-directory: src/gdextension
+        run: cmake --build build --parallel
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-voxel-cad-linux
+          path: builds/
+          retention-days: 7
+
+  # -----------------------------------------------------------------------
+  # 3. C++ clang-format check
+  # -----------------------------------------------------------------------
+  clang-format-check:
+    name: clang-format Check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: sudo apt-get install -y clang-format-15
+
+      - name: Check formatting
+        run: |
+          find src/gdextension -name '*.cpp' -o -name '*.hpp' | \
+          xargs clang-format-15 --dry-run --Werror
+
+  # -----------------------------------------------------------------------
+  # 4. Database schema validation
+  # -----------------------------------------------------------------------
+  db-schema:
+    name: DB Schema Validate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SQLite
+        run: sudo apt-get install -y sqlite3
+
+      - name: Run schema migration
+        run: sqlite3 /tmp/test.db < tools/db/schema_v1.sql
+
+      - name: Verify tables exist
+        run: |
+          TABLES=$(sqlite3 /tmp/test.db ".tables")
+          echo "Tables: $TABLES"
+          for tbl in projects materials layers voxel_chunks load_cases schema_migrations; do
+            echo "$TABLES" | grep -q "$tbl" || (echo "Missing table: $tbl" && exit 1)
+          done
+          echo "All required tables present."
