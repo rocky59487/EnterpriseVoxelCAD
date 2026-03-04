@@ -1,0 +1,67 @@
+# EnterpriseVoxelCAD .clang-format
+# Based on Google style with project-specific overrides
+# Applied to: src/gdextension/**/*.cpp, src/gdextension/**/*.hpp
+---
+BasedOnStyle:              Google
+IndentWidth:               2
+TabWidth:                  2
+UseTab:                    Never
+ColumnLimit:               100
+
+# Alignment
+AlignAfterOpenBracket:     Align
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: None
+AlignOperands:             Align
+AlignTrailingComments:     true
+
+# Braces
+BreakBeforeBraces:         Attach
+BraceWrapping:
+  AfterClass:              false
+  AfterControlStatement:   false
+  AfterFunction:           false
+  AfterNamespace:          false
+  AfterStruct:             false
+  BeforeElse:              false
+
+# Includes
+IncludeBlocks:             Regroup
+IncludeCategories:
+  - Regex:    '^"(voxel_engine|register_types)'
+    Priority: 1
+  - Regex:    '^<godot_cpp/'
+    Priority: 2
+  - Regex:    '^<'
+    Priority: 3
+  - Regex:    '.*'
+    Priority: 4
+SortIncludes:              CaseSensitive
+
+# Namespace
+NamespaceIndentation:      None
+CompactNamespaces:         false
+
+# Function declarations
+AllowShortFunctionsOnASingleLine:  None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine:      false
+AllowShortLambdasOnASingleLine:    All
+
+# Comments
+SpacesBeforeTrailingComments: 2
+ReflowComments:            true
+
+# Penalties (prefer breaking before operators)
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyReturnTypeOnItsOwnLine: 200
+
+# Pointer alignment
+PointerAlignment:          Left
+ReferenceAlignment:        Left
+
+# Miscellaneous
+SortUsingDeclarations:     true
+FixNamespaceComments:      true
+DerivePointerAlignment:    false
+...
